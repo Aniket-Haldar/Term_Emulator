@@ -22,6 +22,10 @@ TerminalEmulator::TerminalEmulator(QWidget *parent) : QWidget(parent), outputAre
     inputArea->setFocus();
     //inputArea->setAcceptRichText(false);
     outputArea->setReadOnly(true);
+    // Set the default background color to blue for retro look
+    outputArea->setStyleSheet("QPlainTextEdit { background-color: blue; color: white;font-weight:900 }");
+    inputArea->setStyleSheet("QLineEdit { background-color: black; color: white; }");
+
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(outputArea);
@@ -132,3 +136,4 @@ void TerminalEmulator::sendInput() {
     }
     inputArea->clear();
 }
+
