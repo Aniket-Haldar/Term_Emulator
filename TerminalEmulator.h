@@ -1,4 +1,3 @@
-// TerminalEmulator.h
 #ifndef TERMINALEMULATOR_H
 #define TERMINALEMULATOR_H
 
@@ -6,26 +5,34 @@
 #include <QPlainTextEdit>
 #include <QLineEdit>
 #include <QSocketNotifier>
+#include <QTextCharFormat>
+#include <QComboBox>
 
 class TerminalEmulator : public QWidget {
     Q_OBJECT
 
 public:
-    explicit TerminalEmulator(QWidget *parent = nullptr);
-    ~TerminalEmulator() override;
-
-    // protected:
-    //     void keyPressEvent(QKeyEvent *event) override;
+    TerminalEmulator(QWidget *parent = nullptr);
+    ~TerminalEmulator();
 
 private slots:
     void readFromMaster();
     void sendInput();
+    void changeBackgroundColor(const QString &colorName);
+    void changeTextColor(const QString &colorName);
 
 private:
+    void appendFormattedText(const QString &text);
+    void applyAnsiCodes(QTextCharFormat &format, const QStringList &codes);
+
     QPlainTextEdit *outputArea;
     QLineEdit *inputArea;
-    int master_fd, slave_fd;
+    QComboBox *backgroundColorComboBox;
+    QComboBox *textColorComboBox;
+    int master_fd;
+    int slave_fd;
     QSocketNotifier *readNotifier;
+    QColor currentTextColor;
 };
 
 #endif // TERMINALEMULATOR_H

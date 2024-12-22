@@ -1,4 +1,3 @@
-// TerminalEmulator.cpp
 #include "TerminalEmulator.h"
 
 #include <QVBoxLayout>
@@ -14,22 +13,48 @@
 #include <iostream>
 #include <cstdlib>
 
-TerminalEmulator::TerminalEmulator(QWidget *parent) : QWidget(parent), outputArea(nullptr), inputArea(nullptr), master_fd(-1), slave_fd(-1), readNotifier(nullptr) {
+TerminalEmulator::TerminalEmulator(QWidget *parent) : QWidget(parent), outputArea(nullptr), inputArea(nullptr), backgroundColorComboBox(nullptr), textColorComboBox(nullptr), master_fd(-1), slave_fd(-1), readNotifier(nullptr), currentTextColor(Qt::white) {
     // Setup the UI
     outputArea = new QPlainTextEdit(this);
-    //inputArea = new QLineEdit(this);
     inputArea = new QLineEdit(this);
     inputArea->setFocus();
-    //inputArea->setAcceptRichText(false);
     outputArea->setReadOnly(true);
-    // Set the default background color to blue for retro look
-    outputArea->setStyleSheet("QPlainTextEdit { background-color: blue; color: white;font-weight:900 }");
+
+    // Set default styles for output and input areas
+    outputArea->setStyleSheet("QPlainTextEdit { background-color: black; color: white; font-weight: bold; }");
     inputArea->setStyleSheet("QLineEdit { background-color: black; color: white; }");
 
+    // Setup the background color selection combo box
+    backgroundColorComboBox = new QComboBox(this);
+    backgroundColorComboBox->addItem("Black", "black");
+    backgroundColorComboBox->addItem("Red", "red");
+    backgroundColorComboBox->addItem("Green", "green");
+    backgroundColorComboBox->addItem("Yellow", "yellow");
+    backgroundColorComboBox->addItem("Blue", "blue");
+    backgroundColorComboBox->addItem("Magenta", "magenta");
+    backgroundColorComboBox->addItem("Cyan", "cyan");
+    backgroundColorComboBox->addItem("White", "white");
+
+    connect(backgroundColorComboBox, &QComboBox::currentTextChanged, this, &TerminalEmulator::changeBackgroundColor);
+
+    // Setup the text color selection combo box
+    textColorComboBox = new QComboBox(this);
+    textColorComboBox->addItem("White", "white");
+    textColorComboBox->addItem("Black", "black");
+    textColorComboBox->addItem("Red", "red");
+    textColorComboBox->addItem("Green", "green");
+    textColorComboBox->addItem("Yellow", "yellow");
+    textColorComboBox->addItem("Blue", "blue");
+    textColorComboBox->addItem("Magenta", "magenta");
+    textColorComboBox->addItem("Cyan", "cyan");
+
+    connect(textColorComboBox, &QComboBox::currentTextChanged, this, &TerminalEmulator::changeTextColor);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(outputArea);
     layout->addWidget(inputArea);
+    layout->addWidget(backgroundColorComboBox);
+    layout->addWidget(textColorComboBox);
 
     setLayout(layout);
 
@@ -76,9 +101,6 @@ TerminalEmulator::TerminalEmulator(QWidget *parent) : QWidget(parent), outputAre
 
         // Handle user input
         connect(inputArea, &QLineEdit::returnPressed, this, &TerminalEmulator::sendInput);
-        // Connect key press event
-        //connect(inputArea, &QTextEdit::textChanged, this, &TerminalEmulator::sendInput);
-
     }
 }
 
@@ -92,38 +114,71 @@ void TerminalEmulator::readFromMaster() {
     if (count > 0) {
         buffer[count] = '\0'; // Null-terminate buffer
         QString output = QString::fromLocal8Bit(buffer);
+
         if (output.contains("\033[H\033[2J")) {
             outputArea->clear(); // Clear the terminal output
             output.remove(QRegularExpression("\033\\[H\\033\\[2J")); // Remove the sequence
         }
 
+        // Remove unsupported sequences
+        output.remove(QRegularExpression("\033\\[\\?2004[h|l]")); // Bracketed paste mode
+        output.remove(QRegularExpression("\033\\[3J")); // Clear scrollback buffer
+        output.remove(QRegularExpression("\x1B\\]0;.*\x07")); // Set terminal title
 
-        // Remove ANSI escape sequences
-        output.remove(QRegularExpression("\x1B\\[[0-9;]*[a-zA-Z]")); // CSI sequences
-        output.remove(QRegularExpression("\x1B\\][^\\x07]*\\x07"));  // OSC sequences
-        output.remove(QRegularExpression("\x1B\\[\\?2004[h|l]"));    // Bracketed paste mode sequences
-        output.remove(QRegularExpression("\x1B\\(B"));               // Character set sequence
-        output.remove(QRegularExpression("\x1B\\]0;[^\\x07]*\\x07"));// Title setting sequences
-        output.remove(QRegularExpression("[\x00-\x1F\x7F]"));           // Remove other non-printable control characters
+        appendFormattedText(output);
 
-        outputArea->appendPlainText(output);
     } else if (count == 0) { // EOF
         readNotifier->setEnabled(false);
     } else { // Error
         perror("read");
     }
 }
-// void TerminalEmulator::keyPressEvent(QKeyEvent *event) {
-//     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-//         // Send input when Enter is pressed
-//         sendInput();
-//     } else {
-//         // Process other keys normallly
-//         QWidget::keyPressEvent(event);
-//     }
-// }
 
+void TerminalEmulator::appendFormattedText(const QString &text) {
+    QTextCursor cursor(outputArea->textCursor());
+    cursor.movePosition(QTextCursor::End);
 
+    QRegularExpression re("\033\\[([0-9;]*)m");
+    QRegularExpressionMatchIterator i = re.globalMatch(text);
+    int lastEnd = 0;
+
+    while (i.hasNext()) {
+        QRegularExpressionMatch match = i.next();
+        QString code = match.captured(1);
+        QString preText = text.mid(lastEnd, match.capturedStart() - lastEnd);
+        lastEnd = match.capturedEnd();
+
+        QTextCharFormat format = cursor.charFormat();
+        applyAnsiCodes(format, code.split(';'));
+        cursor.insertText(preText, format);
+    }
+
+    cursor.insertText(text.mid(lastEnd));
+}
+
+void TerminalEmulator::applyAnsiCodes(QTextCharFormat &format, const QStringList &codes) {
+    for (const QString &code : codes) {
+        int val = code.toInt();
+        switch (val) {
+        case 0: // Reset
+            format = QTextCharFormat();
+            break;
+        case 1: // Bold
+            format.setFontWeight(QFont::Bold);
+            break;
+        // Background colors
+        case 40: format.setBackground(Qt::black); break;
+        case 41: format.setBackground(Qt::red); break;
+        case 42: format.setBackground(Qt::green); break;
+        case 43: format.setBackground(Qt::yellow); break;
+        case 44: format.setBackground(Qt::blue); break;
+        case 45: format.setBackground(Qt::magenta); break;
+        case 46: format.setBackground(Qt::cyan); break;
+        case 47: format.setBackground(Qt::white); break;
+            // Add more cases as needed for other ANSI codes
+        }
+    }
+}
 
 void TerminalEmulator::sendInput() {
     QString input = inputArea->text() + "\n";
@@ -137,3 +192,15 @@ void TerminalEmulator::sendInput() {
     inputArea->clear();
 }
 
+void TerminalEmulator::changeBackgroundColor(const QString &colorName) {
+    QString colorStyleSheet = QString("QPlainTextEdit { background-color: %1; color: %2; font-weight: bold; } QLineEdit { background-color: %1; color: %2; }").arg(colorName).arg(currentTextColor.name());
+    outputArea->setStyleSheet(colorStyleSheet);
+    inputArea->setStyleSheet(colorStyleSheet);
+}
+
+void TerminalEmulator::changeTextColor(const QString &colorName) {
+    currentTextColor = QColor(colorName);
+    QString colorStyleSheet = QString("QPlainTextEdit { background-color: %1; color: %2; font-weight: bold; } QLineEdit { background-color: %1; color: %2; }").arg(backgroundColorComboBox->currentData().toString()).arg(colorName);
+    outputArea->setStyleSheet(colorStyleSheet);
+    inputArea->setStyleSheet(colorStyleSheet);
+}
