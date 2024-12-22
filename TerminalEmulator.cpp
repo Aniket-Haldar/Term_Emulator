@@ -24,7 +24,7 @@ TerminalEmulator::TerminalEmulator(QWidget *parent) : QWidget(parent), outputAre
     outputArea->setStyleSheet("QPlainTextEdit { background-color: black; color: white; font-weight: bold; }");
     inputArea->setStyleSheet("QLineEdit { background-color: black; color: white; }");
 
-    // Setup the background color selection combo box
+    // Setup the background colour selection combo box
     backgroundColorComboBox = new QComboBox(this);
     backgroundColorComboBox->addItem("Black", "black");
     backgroundColorComboBox->addItem("Red", "red");
@@ -37,7 +37,7 @@ TerminalEmulator::TerminalEmulator(QWidget *parent) : QWidget(parent), outputAre
 
     connect(backgroundColorComboBox, &QComboBox::currentTextChanged, this, &TerminalEmulator::changeBackgroundColor);
 
-    // Setup the text color selection combo box
+    // Setup the text colour selection combo box
     textColorComboBox = new QComboBox(this);
     textColorComboBox->addItem("White", "white");
     textColorComboBox->addItem("Black", "black");
@@ -166,7 +166,7 @@ void TerminalEmulator::applyAnsiCodes(QTextCharFormat &format, const QStringList
         case 1: // Bold
             format.setFontWeight(QFont::Bold);
             break;
-        // Background colors
+        // Background colours
         case 40: format.setBackground(Qt::black); break;
         case 41: format.setBackground(Qt::red); break;
         case 42: format.setBackground(Qt::green); break;
@@ -175,7 +175,7 @@ void TerminalEmulator::applyAnsiCodes(QTextCharFormat &format, const QStringList
         case 45: format.setBackground(Qt::magenta); break;
         case 46: format.setBackground(Qt::cyan); break;
         case 47: format.setBackground(Qt::white); break;
-            // Add more cases as needed for other ANSI codes
+
         }
     }
 }
